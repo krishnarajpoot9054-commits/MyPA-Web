@@ -5,7 +5,9 @@ const path = require('node:path');
 const { URL } = require('node:url');
 
 const ROOT = __dirname;
-const PUBLIC = path.join(ROOT, 'public');
+const PUBLIC = fs.existsSync(path.join(ROOT, 'public'))
+  ? path.join(ROOT, 'public')
+  : ROOT;
 const envPath = path.join(ROOT, '.env');
 if (fs.existsSync(envPath)) {
   for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
