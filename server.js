@@ -53,19 +53,21 @@ const server = http.createServer(async (req, res) => {
     try {
       const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
         method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key':key },
-        body:JSON.stringify({ systemInstruction:{parts:[{text:'You are MyPA, a helpful student personal assistant. Reply clearly and concisely. Use simple English, Hindi, or Hinglish to match the user. Do not claim to have changed tasks, calendars, reminders, or attendance; the app handles those only through explicit UI actions.'}]}, contents:[{role:'user',parts:[{text:context ? `User message: ${prompt}\n\nMyPA workspace context (use only to make suggestions; do not claim changes were made): ${context}` : prompt}]}], generationConfig:{temperature:0.5,maxOutputTokens:900} }),
-        signal:AbortSignal.timeout(45_000)
+        body:JSON.stringify({ systemInstruction:{parts:[{text:'You are MyPA, a helpful student personal assistant. Reply clearly and concisely. Use simple English, Hindi, or Hinglish to match the user. Do not claim to have changed tasks, calendars, reminders, or attendance; the app handles those only through explicit UI actions.'}]}, contents:[{role:'user',parts:[{text:context ? `User message: ${prompt}\n\nMyPA workspace context (use only to make suggestions; do not claim changes were made): ${context}` : prompt}]}], generationConfig:{maxOutputTokens:700,thinkingConfig:{thinkingLevel:'low'}} }),
+        signal:AbortSignal.timeout(60_000)
       });
       const result = await upstream.json().catch(() => ({}));
       if (!upstream.ok) {
         const msg = result?.error?.message || `Gemini returned HTTP ${upstream.status}`;
+        console.error(`[Gemini API] HTTP ${upstream.status}: ${msg}`);
         return send(res, upstream.status === 429 ? 429 : upstream.status >= 500 ? 502 : upstream.status, { error:msg, upstreamStatus:upstream.status });
       }
       const text = (result.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
       if (!text) return send(res, 502, { error:'Gemini returned an empty response. Try again.' });
       return send(res, 200, { text });
     } catch (e) {
-      return send(res, 502, { error: e.name === 'TimeoutError' ? 'Gemini request timed out. Try again.' : 'Could not connect to Gemini. Check the server internet connection.' });
+      console.error(`[Gemini API] ${e.name || 'Error'}: ${e.message || 'Unknown error'}`);
+      return send(res, 502, { error: e.name === 'TimeoutError' ? 'Gemini request timed out after 60 seconds. Try again.' : 'Could not connect to Gemini. Check the server internet connection.' });
     }
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error:'Method not allowed' });
